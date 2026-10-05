@@ -24,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,6 +42,8 @@ import static org.mockito.Mockito.inOrder;
 
 @ExtendWith(MockitoExtension.class)
 public class TradeServiceImplTest {
+
+    private static final LocalDateTime TRADE_TIME = LocalDateTime.of(2026, 10, 5, 12, 30);
 
     @Mock
     private TradeMapper tradeMapper;
@@ -116,6 +119,7 @@ public class TradeServiceImplTest {
 
         // Then
         assertThat(result.getTradeId()).isEqualTo(42L);
+        assertThat(result.getCreatedAtDatetime()).isEqualTo(TRADE_TIME);
         assertThat(result.getUserId()).isEqualTo(1L);
         assertThat(result.getTradeType()).isEqualTo(TradeType.BUY);
         assertThat(result.getCryptoPair()).isEqualTo("ETHUSDT");
@@ -126,6 +130,7 @@ public class TradeServiceImplTest {
         ArgumentCaptor<Trade> tradeCaptor = ArgumentCaptor.forClass(Trade.class);
         verify(tradeMapper).insertTrade(tradeCaptor.capture());
         Trade savedTrade = tradeCaptor.getValue();
+        assertThat(savedTrade.getTradeTime()).isEqualTo(TRADE_TIME);
         assertThat(savedTrade.getUserId()).isEqualTo(1L);
         assertThat(savedTrade.getCryptoPairId()).isEqualTo(2L);
         assertThat(savedTrade.getTradeType()).isEqualTo("BUY");
@@ -153,6 +158,7 @@ public class TradeServiceImplTest {
 
         // Then
         assertThat(result.getTradeId()).isEqualTo(42L);
+        assertThat(result.getCreatedAtDatetime()).isEqualTo(TRADE_TIME);
         assertThat(result.getUserId()).isEqualTo(1L);
         assertThat(result.getTradeType()).isEqualTo(TradeType.SELL);
         assertThat(result.getCryptoPair()).isEqualTo("BTCUSDT");
@@ -163,6 +169,7 @@ public class TradeServiceImplTest {
         ArgumentCaptor<Trade> tradeCaptor = ArgumentCaptor.forClass(Trade.class);
         verify(tradeMapper).insertTrade(tradeCaptor.capture());
         Trade savedTrade = tradeCaptor.getValue();
+        assertThat(savedTrade.getTradeTime()).isEqualTo(TRADE_TIME);
         assertThat(savedTrade.getUserId()).isEqualTo(1L);
         assertThat(savedTrade.getCryptoPairId()).isEqualTo(1L);
         assertThat(savedTrade.getTradeType()).isEqualTo("SELL");
@@ -293,6 +300,7 @@ public class TradeServiceImplTest {
         doAnswer(invocation -> {
             Trade trade = invocation.getArgument(0);
             trade.setId(42L);
+            trade.setTradeTime(TRADE_TIME);
             return null;
         }).when(tradeMapper).insertTrade(any(Trade.class));
 
@@ -301,6 +309,7 @@ public class TradeServiceImplTest {
 
         // Then
         assertThat(result.getTradeId()).isEqualTo(42L);
+        assertThat(result.getCreatedAtDatetime()).isEqualTo(TRADE_TIME);
         assertThat(result.getTradeType()).isEqualTo(TradeType.BUY);
         assertThat(result.getCryptoPair()).isEqualTo("ETHUSDT");
         assertThat(result.getQuantity()).isEqualByComparingTo("2.00");
@@ -332,6 +341,7 @@ public class TradeServiceImplTest {
         setUpDB(btcPair, btcWallet);
         TradeResponse result = tradeService.executeTrade(
                 new TradeRequest(1L, TradeType.SELL, new BigDecimal("1.00"), "BTCUSDT"));
+        assertThat(result.getCreatedAtDatetime()).isEqualTo(TRADE_TIME);
         assertThat(result.getTotalAmount()).isEqualByComparingTo("50000.00");
         assertWalletBalance(1L, "0");
         assertWalletBalance(3L, "60000.00");
@@ -393,6 +403,7 @@ public class TradeServiceImplTest {
         setUpDB(pair, ethWallet);
         TradeResponse result = tradeService.executeTrade(
                 new TradeRequest(1L, TradeType.BUY, new BigDecimal("0.12345678"), "ETHUSDT"));
+        assertThat(result.getCreatedAtDatetime()).isEqualTo(TRADE_TIME);
         assertThat(result.getQuantity()).isEqualByComparingTo("0.12345678");
         assertThat(result.getTotalAmount()).isEqualByComparingTo("376.54317900");
         ArgumentCaptor<Trade> captor = ArgumentCaptor.forClass(Trade.class);
@@ -445,6 +456,7 @@ public class TradeServiceImplTest {
         doAnswer(invocation -> {
             Trade trade = invocation.getArgument(0);
             trade.setId(42L);
+            trade.setTradeTime(TRADE_TIME);
             return null;
         }).when(tradeMapper).insertTrade(any(Trade.class));
     }

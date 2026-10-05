@@ -78,8 +78,6 @@ public class TradeServiceImpl implements TradeServiceInterface {
         // b. Update the wallet balances in DB
         updateWalletBalances(tradeRequest, cryptoPrice, quoteBalance, baseBalance, cryptoPair);
 
-        log.info("Trade has been successfully executed. tradeId={}", trade.getId());
-
         TradeResponse tradeResponse = new TradeResponse();
         tradeResponse.setUserId(tradeRequest.getUserId());
         tradeResponse.setTradeId(trade.getId());
@@ -88,6 +86,7 @@ public class TradeServiceImpl implements TradeServiceInterface {
         tradeResponse.setCryptoPair(tradeRequest.getCryptoPair());
         tradeResponse.setPrice(trade.getPrice());
         tradeResponse.setTotalAmount(trade.getTotalAmount());
+        tradeResponse.setCreatedAtDatetime(trade.getTradeTime());
         return tradeResponse;
     }
 

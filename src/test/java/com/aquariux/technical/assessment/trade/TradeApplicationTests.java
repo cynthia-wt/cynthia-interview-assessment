@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.coyote.BadRequestException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -145,6 +147,30 @@ class TradeApplicationTests {
             executor.shutdownNow();
             assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"userId", "tradeType", "quantity", "cryptoPair", "zeroQuantity", "negativeQuantity", "blankPair"})
+    void invalidRequest_ShouldReturn400WithoutDatabaseChanges(String invalidField) throws Exception {
+        TradeRequest request = new TradeRequest(1L, TradeType.BUY, new BigDecimal("2"), "ETHUSDT");
+        switch (invalidField) {
+            case "userId" -> request.setUserId(null);
+            case "tradeType" -> request.setTradeType(null);
+            case "quantity" -> request.setQuantity(null);
+            case "cryptoPair" -> request.setCryptoPair(null);
+            case "zeroQuantity" -> request.setQuantity(BigDecimal.ZERO);
+            case "negativeQuantity" -> request.setQuantity(new BigDecimal("-1"));
+            case "blankPair" -> request.setCryptoPair("   ");
+            default -> throw new IllegalArgumentException(invalidField);
+        }
+        mockMvc.perform(post("/api/trades/execute")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+        assertThat(tradeCount()).isZero();
+        assertBalance(3L, "10000");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM user_wallets WHERE user_id = 1", Integer.class))
+                .isEqualTo(1);
     }
 
     private boolean executeConcurrentBuy(CountDownLatch ready, CountDownLatch start) throws Exception {

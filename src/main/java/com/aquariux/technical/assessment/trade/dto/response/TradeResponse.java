@@ -4,6 +4,7 @@ import com.aquariux.technical.assessment.trade.enums.TradeType;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Data
 public class TradeResponse {
@@ -14,4 +15,5 @@ public class TradeResponse {
     private BigDecimal quantity;
     private BigDecimal price;
     private BigDecimal totalAmount;
+    private LocalDateTime createdAtDatetime;
 }
