@@ -35,8 +35,8 @@ public class TradeServiceImpl implements TradeServiceInterface {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public TradeResponse executeTrade(TradeRequest tradeRequest) throws BadRequestException {
-        // Validate request
-        validateRequest(tradeRequest);
+        // Ensure that we process trades for the same user one at a time, while validating the userId
+        lockAndValidateUser(tradeRequest);
 
         // Get latest best crypto price for given crypto pair
         CryptoPair cryptoPair = cryptoPairMapper.findByPairName(tradeRequest.getCryptoPair());
@@ -130,10 +130,10 @@ public class TradeServiceImpl implements TradeServiceInterface {
         }
     }
 
-    private void validateRequest(TradeRequest tradeRequest) throws BadRequestException {
+    private void lockAndValidateUser(TradeRequest tradeRequest) throws BadRequestException {
         Long userId = tradeRequest.getUserId();
 
-        if (!userMapper.existsByUserId(userId)) {
+        if (userMapper.findUserIdForUpdate(userId) == null) {
             log.error("User does not exist. userId={}", userId);
             throw new BadRequestException("User does not exist. userId=" + userId);
         }

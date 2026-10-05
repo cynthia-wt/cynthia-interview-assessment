@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -36,6 +37,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.inOrder;
 
 @ExtendWith(MockitoExtension.class)
 public class TradeServiceImplTest {
@@ -181,7 +183,7 @@ public class TradeServiceImplTest {
     void executeTrade_WhenUserDoesNotExist_ShouldThrowWithMessage() {
         // Given
         TradeRequest request = new TradeRequest(999L, TradeType.BUY, new BigDecimal("2.00"), "ETHUSDT");
-        when(userMapper.existsByUserId(999L)).thenReturn(false);
+        when(userMapper.findUserIdForUpdate(999L)).thenReturn(null);
 
         // When / Then
         assertThatThrownBy(() -> tradeService.executeTrade(request))
@@ -194,7 +196,7 @@ public class TradeServiceImplTest {
     void executeTrade_WhenCryptoPairNotFound_ShouldThrowWithMessage() {
         // Given
         TradeRequest request = new TradeRequest(1L, TradeType.BUY, new BigDecimal("2.00"), "UNKNOWN");
-        when(userMapper.existsByUserId(1L)).thenReturn(true);
+        when(userMapper.findUserIdForUpdate(1L)).thenReturn(1L);
         when(cryptoPairMapper.findByPairName("UNKNOWN")).thenReturn(null);
 
         // When / Then
@@ -209,7 +211,7 @@ public class TradeServiceImplTest {
         // Given
         TradeRequest request = new TradeRequest(1L, TradeType.BUY, new BigDecimal("2.00"), "ETHUSDT");
         pair.setActive(false);
-        when(userMapper.existsByUserId(1L)).thenReturn(true);
+        when(userMapper.findUserIdForUpdate(1L)).thenReturn(1L);
         when(cryptoPairMapper.findByPairName("ETHUSDT")).thenReturn(pair);
 
         // When / Then
@@ -223,7 +225,7 @@ public class TradeServiceImplTest {
     void executeTrade_WhenRequestedPairPriceMissing_ShouldThrowWithMessage() {
         // Given
         TradeRequest request = new TradeRequest(1L, TradeType.BUY, new BigDecimal("2.00"), "ETHUSDT");
-        when(userMapper.existsByUserId(1L)).thenReturn(true);
+        when(userMapper.findUserIdForUpdate(1L)).thenReturn(1L);
         when(cryptoPairMapper.findByPairName("ETHUSDT")).thenReturn(pair);
         when(cryptoPriceMapper.findLatestPrices()).thenReturn(List.of(btcPrice));
 
@@ -283,7 +285,7 @@ public class TradeServiceImplTest {
     void executeTrade_WhenBuyingWithoutBaseWallet_ShouldUpsertNewWalletBalance() throws Exception {
         // Given
         TradeRequest request = new TradeRequest(1L, TradeType.BUY, new BigDecimal("2.00"), "ETHUSDT");
-        when(userMapper.existsByUserId(1L)).thenReturn(true);
+        when(userMapper.findUserIdForUpdate(1L)).thenReturn(1L);
         when(cryptoPairMapper.findByPairName("ETHUSDT")).thenReturn(pair);
         when(cryptoPriceMapper.findLatestPrices()).thenReturn(List.of(btcPrice, ethPrice));
         // No ETH wallet exists yet; only the USDT wallet is returned.
@@ -402,7 +404,7 @@ public class TradeServiceImplTest {
 
     @Test
     void executeTrade_WhenPriceListEmpty_ShouldRejectWithoutWrites() {
-        when(userMapper.existsByUserId(1L)).thenReturn(true);
+        when(userMapper.findUserIdForUpdate(1L)).thenReturn(1L);
         when(cryptoPairMapper.findByPairName("ETHUSDT")).thenReturn(pair);
         when(cryptoPriceMapper.findLatestPrices()).thenReturn(List.of());
         assertThatThrownBy(() -> tradeService.executeTrade(
@@ -410,6 +412,21 @@ public class TradeServiceImplTest {
                 .isInstanceOf(InternalError.class)
                 .hasMessage("Crypto price not found for crypto pair. cryptoPairId=2 cryptoPair=ETHUSDT");
         verifyNoInteractions(userWalletMapper, tradeMapper);
+    }
+
+    @Test
+    void executeTrade_ShouldLockUserBeforeReadingAndWritingWallets() throws Exception {
+        setUpDB(pair, ethWallet);
+
+        tradeService.executeTrade(
+                new TradeRequest(1L, TradeType.BUY, new BigDecimal("2.00"), "ETHUSDT"));
+
+        InOrder order = inOrder(userMapper, userWalletMapper, tradeMapper);
+        order.verify(userMapper).findUserIdForUpdate(1L);
+        order.verify(userWalletMapper).findByUserId(1L);
+        order.verify(tradeMapper).insertTrade(any(Trade.class));
+        order.verify(userWalletMapper).upsertBalance(eq(1L), eq(3L), any());
+        order.verify(userWalletMapper).upsertBalance(eq(1L), eq(2L), any());
     }
 
     private void assertWalletBalance(Long symbolId, String expected) {
@@ -433,7 +450,7 @@ public class TradeServiceImplTest {
     }
 
     private void mockTradeValidationDependencies(CryptoPair cryptoPair, UserWalletDto baseWallet) {
-        when(userMapper.existsByUserId(1L)).thenReturn(true);
+        when(userMapper.findUserIdForUpdate(1L)).thenReturn(1L);
         when(cryptoPairMapper.findByPairName(cryptoPair.getPairName())).thenReturn(cryptoPair);
         when(cryptoPriceMapper.findLatestPrices()).thenReturn(List.of(btcPrice, ethPrice));
         when(userWalletMapper.findByUserId(1L)).thenReturn(List.of(usdtWallet, baseWallet));
